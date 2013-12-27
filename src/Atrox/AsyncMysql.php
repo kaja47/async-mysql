@@ -31,7 +31,7 @@ class AsyncMysql {
 
     $defered = new Deferred();
     $resolver = $defered->resolver();
-    $this->loop->addPeriodicTimer(0.002, function ($signature, $loop) use($conn, $resolver) {
+    $this->loop->addPeriodicTimer(0.002, function ($timer) use($conn, $resolver) {
       $links = $errors = $reject = array($conn);
       mysqli_poll($links, $errors, $reject, 0); // don't wait, just check
       if (($read = in_array($conn, $links, true)) || ($err = in_array($conn, $errors, true)) || ($rej = in_array($conn, $reject, true))) {
@@ -42,7 +42,7 @@ class AsyncMysql {
         } else {
           $resolver->reject('Query was rejected');
         }
-        $loop->cancelTimer($signature);
+        $timer->cancel();
         $conn->close();
       }
     });
