@@ -34,7 +34,18 @@ $loop = React\EventLoop\Factory::create();
 
 $makeConnection = function () { return mysqli_connect('localhost', 'user', 'pass', ' dbname'); };
 $mysql = \Atrox\AsyncMysql($makeConnection, $loop);
-$mysql->query('select * from ponies_and_unicorns')->then(
+
+$query = function($conn) { return 'select * from ponies_and_unicorns'; };
+$mysql->query($query)->then(
+  function ($result) { writeHttpResponse(json_encode($result->fetch_all(MYSQLI_ASSOC))); $result->close(); },
+  function ($error)  { writeHeader500(); }
+);
+
+$query = function($conn) {
+  $name = $conn->real_escape_string('Fluttershy');
+  return "select * from ponies_and_unicorns where name = '$name'";
+};
+$mysql->query($query)->then(
   function ($result) { writeHttpResponse(json_encode($result->fetch_all(MYSQLI_ASSOC))); $result->close(); },
   function ($error)  { writeHeader500(); }
 );

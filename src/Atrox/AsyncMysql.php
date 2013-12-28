@@ -22,27 +22,33 @@ class AsyncMysql {
   }
 
   /**
-   * @param string
+   * @param callable function that makes query
    * @return React\Promise\PromiseInterface
    */
-  function query($query) {
+  function query($makeQuery) {
     $conn = call_user_func($this->makeConnection);
+    $query = call_user_func($makeQuery, $conn);
     $conn->query($query, MYSQLI_ASYNC);
 
     $defered = new Deferred();
     $resolver = $defered->resolver();
-    $this->loop->addPeriodicTimer(0.002, function ($signature, $loop) use($conn, $resolver) {
+    $this->loop->addPeriodicTimer(0.002, function ($timer) use($conn, $resolver) {
       $links = $errors = $reject = array($conn);
       mysqli_poll($links, $errors, $reject, 0); // don't wait, just check
       if (($read = in_array($conn, $links, true)) || ($err = in_array($conn, $errors, true)) || ($rej = in_array($conn, $reject, true))) {
         if ($read) {
-          $resolver->resolve($conn->reap_async_query());
+          $result = $conn->reap_async_query();
+          if ($result === false) {
+            $resolver->reject($conn->error);
+          } else {
+            $resolver->resolve($result);
+          }
         } elseif ($err) {
           $resolver->reject($conn->error_list);
         } else {
           $resolver->reject('Query was rejected');
         }
-        $loop->cancelTimer($signature);
+        $timer->cancel();
         $conn->close();
       }
     });
