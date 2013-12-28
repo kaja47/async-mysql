@@ -22,11 +22,12 @@ class AsyncMysql {
   }
 
   /**
-   * @param string
+   * @param callable function that makes query
    * @return React\Promise\PromiseInterface
    */
-  function query($query) {
+  function query($makeQuery) {
     $conn = call_user_func($this->makeConnection);
+    $query = call_user_func($makeQuery, $conn);
     $conn->query($query, MYSQLI_ASYNC);
 
     $defered = new Deferred();
