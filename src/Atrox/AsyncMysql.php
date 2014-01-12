@@ -4,24 +4,23 @@ namespace Atrox;
 
 use React\Promise;
 use React\Promise\Deferred;
+use React\EventLoop\LoopInterface;
+
 
 class AsyncMysql {
+
   private $loop;
-  private $makeConnection;
+  private $pool;
+
 
   /**
    * @param callable fucnction that makes connection
    * @param React\EventLoop\LoopInterface
+   * @param Atrox\ConnectionPool
    */
-  function __construct($makeConnection, $loop) {
-    $this->makeConnection = $makeConnection;
+  function __construct($makeConnection, LoopInterface $loop, ConnectionPool $connectionPool = null) {
     $this->loop = $loop;
-  }
-
-
-  private function getConnection() {
-    $conn = call_user_func($this->makeConnection);
-    return ($conn === false) ? Promise\reject(new \Exception(mysqli_connect_error())) : Promise\resolve($conn);
+    $this->pool = ($connectionPool === null) ? new ConnectionPool($makeConnection, 100) : $connectionPool;
   }
 
 
@@ -30,10 +29,11 @@ class AsyncMysql {
    * @return React\Promise\PromiseInterface
    */
   function query($query) {
-    return $this->getConnection()->then(function ($conn) use ($query) {
+    return $this->pool->getConnection()->then(function ($conn) use ($query) {
       $status = $conn->query($query, MYSQLI_ASYNC);
       if ($status === false) {
-        throw new \Exception($mysqli->error);
+        $this->pool->freeConnection($conn);
+        throw new \Exception($conn->error);
       }
 
       $defered = new Deferred();
@@ -55,11 +55,68 @@ class AsyncMysql {
             $defered->reject(new \Exception('Query was rejected'));
           }
           $timer->cancel();
-          $conn->close();
+          $this->pool->freeConnection($conn);
         }
       });
 
       return $defered->promise();
     });
+  }
+}
+
+
+
+class ConnectionPool {
+
+  private $makeConnection;
+  private $maxConnections;
+
+  /** pool of all connections (both idle and busy) */
+  private $pool;
+
+  /** pool of idle connections */
+  private $idle;
+
+  /** array of Deferred objects waiting to be resolved with connection */
+  private $waiting = [];
+
+
+  function __construct($makeConnection, $maxConnections = 100) {
+    $this->makeConnection = $makeConnection;
+    $this->maxConnections = $maxConnections;
+    $this->pool = new \SplObjectStorage();
+    $this->idle = new \SplObjectStorage();
+  }
+
+
+  function getConnection() {
+    // reuse idle connections
+    if (count($this->idle) > 0) {
+      $this->idle->rewind();
+      $conn = $this->idle->current();
+      $this->idle->detach($conn);
+      return Promise\resolve($conn);
+    }
+
+    // max connections reached, must wait till one connection is freed
+    if (count($this->pool) >= $this->maxConnections) {
+      $deferred = new Deferred();
+      $this->waiting[] = $deferred;
+      return $deferred->promise();
+    }
+
+    $conn = call_user_func($this->makeConnection);
+    $this->pool->attach($conn);
+    return ($conn === false) ? Promise\reject(new \Exception(mysqli_connect_error())) : Promise\resolve($conn);
+  }
+
+
+  function freeConnection(\mysqli $conn) {
+    if (!empty($this->waiting)) {
+      $deferred = array_shift($this->waiting);
+      $deferred->resolve($conn);
+    } else {
+      return $this->idle->attach($conn);
+    }
   }
 }
