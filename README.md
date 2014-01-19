@@ -9,7 +9,6 @@ Add this crap to your composer.json:
 ```
 {
   "require": {
-    "react/react": "0.2.*",
     "atrox/async-mysql": "dev-master"
   },
   "repositories": [

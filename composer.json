@@ -1,9 +1,13 @@
 {
   "name": "atrox/async-mysql",
   "description": "Asynchronous & non-blocking MySQL driver for React.PHP",
+  "license": "New BSD",
+  "authors": [
+      {"name": "Karel Čížek", "email": "kaja47@k47.cz"}
+  ],
   "require": {
     "php": ">=5.4.0",
-    "react/react": "0.4.x-dev"
+    "react/react": "dev-master"
   },
   "autoload": {
     "psr-0": {"Atrox": "src/"}
