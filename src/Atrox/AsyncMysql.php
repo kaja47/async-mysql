@@ -14,13 +14,12 @@ class AsyncMysql {
 
 
   /**
-   * @param callable fucnction that makes connection
    * @param React\EventLoop\LoopInterface
-   * @param Atrox\ConnectionPool
+   * @param Atrox\ConnectionPool|callable either connection pool or function that makes connection
    */
-  function __construct($makeConnection, LoopInterface $loop, ConnectionPool $connectionPool = null) {
+  function __construct(LoopInterface $loop, $connectionPool, $maxConnections = 100) {
     $this->loop = $loop;
-    $this->pool = ($connectionPool === null) ? new ConnectionPool($makeConnection, 100) : $connectionPool;
+    $this->pool = ($connectionPool instanceof ConnectionPool) ? $connectionPool : new ConnectionPool($connectionPool, $maxConnections);
   }
 
 

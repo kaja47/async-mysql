@@ -31,8 +31,11 @@ It returns [Promise](https://github.com/reactphp/promise) of [mysqli_result](htt
 
 $loop = React\EventLoop\Factory::create();
 
-$makeConnection = function () { return mysqli_connect('localhost', 'user', 'pass', ' dbname'); };
-$mysql = \Atrox\AsyncMysql($makeConnection, $loop);
+$makeConnection = function () {
+  return mysqli_connect('localhost', 'user', 'pass', 'dbname');
+};
+
+$mysql = new Atrox\AsyncMysql($loop, $makeConnection);
 $mysql->query('select * from ponies_and_unicorns')->then(
   function ($result) { writeHttpResponse(json_encode($result->fetch_all(MYSQLI_ASSOC))); $result->close(); },
   function ($error)  { writeHeader500(); }
